@@ -1,0 +1,1226 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>Star Blaster - Overheat + Laser Lv.6</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      font-family:system-ui,-apple-system, BlinkMacSystemFont,"Prompt","Segoe UI",sans-serif;
+      background:#020617;
+      color:#e5e7eb;
+    }
+    #gameCanvas{
+      display:block;
+      width:100vw;
+      height:100vh;
+      image-rendering:pixelated;
+      background:radial-gradient(circle at 20% 0%,#1d243f,transparent 55%),
+                 radial-gradient(circle at 80% 100%,#3b1641,transparent 55%),
+                 #020617;
+    }
+
+    .hud{
+      position:fixed;
+      top:8px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      justify-content:center;
+      z-index:10;
+      font-size:12px;
+      text-shadow:0 2px 4px rgba(0,0,0,.8);
+    }
+    .badge{
+      background:rgba(15,23,42,.9);
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,.7);
+      backdrop-filter:blur(8px);
+    }
+
+    .heat-container{
+      position:fixed;
+      top:40px;
+      left:50%;
+      transform:translateX(-50%);
+      width:260px;
+      max-width:80vw;
+      background:rgba(15,23,42,.9);
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,.7);
+      padding:4px 8px 6px;
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      z-index:10;
+      backdrop-filter:blur(8px);
+    }
+    .heat-label-row{
+      display:flex;
+      justify-content:space-between;
+      font-size:11px;
+    }
+    .heat-bar{
+      width:100%;
+      height:10px;
+      border-radius:999px;
+      background:rgba(15,23,42,1);
+      overflow:hidden;
+      border:1px solid rgba(30,64,175,.7);
+    }
+    .heat-fill{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg,#22c55e,#eab308,#ef4444);
+      transition:width .08s linear;
+    }
+    .heat-status{
+      font-size:11px;
+      text-align:right;
+    }
+
+    .popup{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:20;
+    }
+    .popup-inner{
+      background:rgba(15,23,42,.97);
+      border-radius:18px;
+      padding:18px 22px;
+      border:1px solid rgba(148,163,184,.8);
+      box-shadow:0 20px 50px rgba(0,0,0,.85);
+      max-width:90vw;
+      text-align:center;
+    }
+    .popup-inner h2{
+      margin-bottom:6px;
+      font-size:20px;
+    }
+    .popup-inner p{
+      margin:4px 0;
+      font-size:13px;
+      white-space:pre-line;
+    }
+    .popup-inner button{
+      margin-top:10px;
+      padding:7px 16px;
+      border-radius:999px;
+      border:none;
+      background:linear-gradient(135deg,#38bdf8,#a855f7);
+      color:#020617;
+      font-weight:600;
+      cursor:pointer;
+      box-shadow:0 10px 25px rgba(0,0,0,.8);
+    }
+
+    @media (max-width:768px){
+      .hud{font-size:11px;}
+      .heat-container{top:36px;}
+      .popup-inner{padding:16px 16px;}
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- เสียง (ไม่มีก็เงียบ แต่เล่นได้) -->
+<audio id="bgm"      src="bgm.mp3"        preload="auto" loop></audio>
+<audio id="s-shot"   src="shoot.mp3"      preload="auto"></audio>
+<audio id="s-hit"    src="explosion.mp3"  preload="auto"></audio>
+<audio id="s-dmg"    src="damage.mp3"     preload="auto"></audio>
+<audio id="s-power"  src="powerup.mp3"    preload="auto"></audio>
+<audio id="s-heal"   src="heal.mp3"       preload="auto"></audio>
+<audio id="s-laser"   src="laser.mp3"       preload="auto"></audio>
+<audio id="s-overheat" src="overheat.mp3"    preload="auto"></audio>
+
+<!-- HUD -->
+<div class="hud">
+  <span class="badge" id="timeLabel">เวลา: 0.0 s</span>
+  <span class="badge" id="scoreLabel">คะแนน: 0</span>
+  <span class="badge" id="lifeLabel">พลังชีวิต: ❤️❤️❤️</span>
+  <span class="badge" id="waveLabel">Wave: 1</span>
+  <span class="badge" id="weaponLabel">อาวุธ: Lv.1 (ยิงเดี่ยว)</span>
+</div>
+
+<!-- Heat (Overheat) -->
+<div class="heat-container">
+  <div class="heat-label-row">
+    <span>ความร้อนปืน (Heat)</span>
+    <span id="heatPercent">0%</span>
+  </div>
+  <div class="heat-bar">
+    <div class="heat-fill" id="heatFill"></div>
+  </div>
+  <div class="heat-status" id="heatStatus">พร้อมยิง</div>
+</div>
+
+<!-- Popup -->
+<div class="popup" id="popup">
+  <div class="popup-inner">
+    <h2 id="popupTitle">Star Blaster - Overheat + Laser</h2>
+    <p id="popupText">
+เกมยิงอวกาศพร้อมระบบอัปเกรดอาวุธ Lv.1 - Lv.6
+และระบบความร้อนปืน (Overheat + เลเซอร์)
+
+การบังคับ:
+- A / ← = ซ้าย
+- D / → = ขวา
+- Space / คลิกเมาส์ = ยิง
+
+อาวุธ:
+- เก็บ 🔥 เพื่ออัปเกรดอาวุธ (สูงสุด Lv.6)
+- Lv.6 เป็นลำแสงเลเซอร์ที่ยิงทะลุศัตรูได้หลายตัว
+- ยิ่งเลเวลสูง ปืนยิ่งร้อนเร็ว
+
+ระบบความร้อน:
+- ยิง = ความร้อนเพิ่ม
+- ถ้าเกจเต็ม = Overheat ยิงไม่ได้ ต้องรอให้เย็นลง
+
+เก็บ 💗 เพื่อเพิ่มพลังชีวิต
+ทุก Wave ที่ 5,10,... จะมีบอสโผล่
+
+กดปุ่มใด ๆ หรือคลิกเพื่อเริ่มเกม
+    </p>
+    <button id="startBtn">เริ่มใหม่</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let W = window.innerWidth;
+let H = window.innerHeight;
+canvas.width = W;
+canvas.height = H;
+
+// ===== เสียง =====
+const bgm     = document.getElementById('bgm');
+const sShot   = document.getElementById('s-shot');
+const sHit    = document.getElementById('s-hit');
+const sDmg    = document.getElementById('s-dmg');
+const sPower  = document.getElementById('s-power');
+const sHeal   = document.getElementById('s-heal');
+const sLaser    = document.getElementById('s-laser');
+const sOverheat = document.getElementById('s-overheat');
+
+if (bgm) { bgm.volume = 0.35; }
+if (sShot)  sShot.volume  = 0.7;
+if (sHit)   sHit.volume   = 0.9;
+if (sDmg)   sDmg.volume   = 0.8;
+if (sPower) sPower.volume = 0.9;
+if (sHeal)  sHeal.volume  = 0.9;
+if (sLaser)    sLaser.volume    = 0.9;  // เลเซอร์ดังหน่อย
+if (sOverheat) sOverheat.volume = 1.0;  // เตือนดังชัด ๆ
+
+function playSound(a){
+  if(!a) return;
+  try{
+    a.currentTime = 0;
+    a.play();
+  }catch(e){}
+}
+
+// HUD elements
+const timeLabel   = document.getElementById('timeLabel');
+const scoreLabel  = document.getElementById('scoreLabel');
+const lifeLabel   = document.getElementById('lifeLabel');
+const waveLabel   = document.getElementById('waveLabel');
+const weaponLabel = document.getElementById('weaponLabel');
+const heatFill    = document.getElementById('heatFill');
+const heatPercent = document.getElementById('heatPercent');
+const heatStatus  = document.getElementById('heatStatus');
+
+const popup       = document.getElementById('popup');
+const popupTitle  = document.getElementById('popupTitle');
+const popupText   = document.getElementById('popupText');
+const startBtn    = document.getElementById('startBtn');
+
+// Game state
+let player;
+let bullets = [];
+let enemies = [];
+let enemyBullets = [];
+let particles = [];
+let powerups = [];
+
+let keys = {};
+let gameRunning = false;
+let gameOver = false;
+let lastTime = 0;
+let elapsed = 0;
+let score = 0;
+let lives = 3;
+let maxLives = 5;
+let wave = 1;
+let isBossWave = false;
+
+// Weapon & heat
+let weaponLevel = 1;          // 1..6
+const maxWeaponLevel = 6;
+let shootCooldown = 0;
+let heat = 0;
+const maxHeat = 100;
+let overheat = false;
+const baseCoolRate = 25;      // ต่อวินาที
+
+// Screen shake
+let shakeTime = 0;
+let shakeMagnitude = 12;
+
+// Stars
+let stars = [];
+function initStars(){
+  stars = [];
+  const count = Math.floor((W*H)/2500);
+  for(let i=0;i<count;i++){
+    stars.push({
+      x:Math.random()*W,
+      y:Math.random()*H,
+      speed:20+Math.random()*40,
+      size:Math.random()*2+0.5
+    });
+  }
+}
+
+// Player
+function createPlayer(){
+  const w = Math.max(40,W*0.05);
+  const h = w*1.1;
+  return {
+    x:W/2,
+    y:H*0.8,
+    width:w,
+    height:h,
+    speed:Math.max(250,W*0.3),
+    invincible:0
+  };
+}
+
+// Enemies
+function spawnWave(){
+  enemies = [];
+  isBossWave = false;
+  if(wave % 5 === 0){
+    isBossWave = true;
+    const bossHP = 25 + wave*4;
+    enemies.push({
+      x:W/2,
+      y:90,
+      baseY:90,
+      vx:80,
+      vy:0,
+      width:160,
+      height:110,
+      hp:bossHP,
+      maxHp:bossHP,
+      shootTimer:0.7,
+      isBoss:true
+    });
+  }else{
+    const cols = 5 + Math.min(6,wave);
+    const rows = 2 + Math.min(3,Math.floor(wave/2));
+    const marginX = 50;
+    const marginY = 60;
+    const areaWidth = W - marginX*2;
+    const spacingX = areaWidth / (cols-1 || 1);
+    const spacingY = 48;
+
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const x = marginX + c*spacingX;
+        const y = marginY + r*spacingY;
+        enemies.push({
+          x,
+          y,
+          vx:(Math.random()<0.5?-1:1)*(20+Math.random()*20),
+          vy:10+wave*2,
+          width:32,
+          height:26,
+          hp:1+Math.floor(wave/3),
+          maxHp:1+Math.floor(wave/3),
+          shootTimer:1.5+Math.random()*1.5,
+          isBoss:false
+        });
+      }
+    }
+  }
+}
+
+// Powerups
+function spawnPowerup(x,y,type){
+  powerups.push({
+    x,
+    y,
+    vy:80,
+    type // "heart" | "weapon"
+  });
+}
+
+// Bullets
+function addBullet(x,y,vx,vy,damage){
+  bullets.push({
+    x,y,vx,vy,
+    radius:4,
+    damage,
+    isLaser:false,
+    life:0
+  });
+}
+
+// Heat UI
+function updateHeatUI(){
+  const ratio = heat / maxHeat;
+  heatFill.style.width = (ratio*100).toFixed(0) + "%";
+  heatPercent.textContent = Math.round(ratio*100) + "%";
+
+  if(overheat){
+    heatStatus.textContent = "Overheat! ปืนร้อนเกิน ยิงไม่ได้";
+  }else if(ratio > 0.8){
+    heatStatus.textContent = "ใกล้ Overheat";
+  }else if(ratio > 0.4){
+    heatStatus.textContent = "ปืนเริ่มร้อน";
+  }else{
+    heatStatus.textContent = "พร้อมยิง";
+  }
+}
+
+// HUD
+function updateHUD(){
+  timeLabel.textContent  = "เวลา: " + elapsed.toFixed(1) + " s";
+  scoreLabel.textContent = "คะแนน: " + score;
+  waveLabel.textContent  = "Wave: " + wave + (isBossWave ? " (Boss)" : "");
+  const hearts = "❤️".repeat(lives) + "🖤".repeat(Math.max(0,maxLives-lives));
+  lifeLabel.textContent  = "พลังชีวิต: " + hearts;
+
+  let weaponText = "";
+  if(weaponLevel===1) weaponText="Lv.1 (ยิงเดี่ยว)";
+  else if(weaponLevel===2) weaponText="Lv.2 (ยิงคู่)";
+  else if(weaponLevel===3) weaponText="Lv.3 (สามทาง)";
+  else if(weaponLevel===4) weaponText="Lv.4 (สี่นัดรัว)";
+  else if(weaponLevel===5) weaponText="Lv.5 (ห้านัดกระจาย)";
+  else weaponText="Lv.6 (เลเซอร์ทะลุศัตรู)";
+
+  weaponLabel.textContent = "อาวุธ: " + weaponText;
+  updateHeatUI();
+}
+
+// Input
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(!gameRunning && !gameOver){
+    startGame();
+  }else if(gameOver){
+    resetGame();
+  }
+});
+window.addEventListener('keyup',e=>{
+  keys[e.code]=false;
+});
+
+canvas.addEventListener('mousedown',()=>{
+  if(!gameRunning && !gameOver){
+    startGame();
+  }else if(gameOver){
+    resetGame();
+  }else{
+    tryShoot();
+  }
+});
+
+startBtn.addEventListener('click',()=>{
+  if(gameOver) resetGame();
+  else startGame();
+});
+
+window.addEventListener('resize',()=>{
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W;
+  canvas.height = H;
+  initStars();
+});
+
+// Shooting with pattern & heat (รวม Lv.6 เลเซอร์)
+function tryShoot(){
+  if(!gameRunning) return;
+  if(shootCooldown>0) return;
+  if(overheat) return;
+
+  const speed = 520;
+  const px = player.x;
+  const py = player.y - player.height/2;
+  const dmgBase = 1 + Math.floor((weaponLevel-1)/2);
+
+  const baseHeatPerShot = 10;
+  const extraHeat = (weaponLevel-1)*4;
+  let heatThisShot = baseHeatPerShot + extraHeat;
+
+  // คูลดาวน์พื้นฐาน
+  let thisCooldown = 0.17;
+
+  if(weaponLevel === 1){
+    // ยิงเดี่ยว
+    addBullet(px,py,0,-speed,dmgBase);
+  }else if(weaponLevel === 2){
+    // ยิงคู่
+    addBullet(px-8,py,0,-speed,dmgBase);
+    addBullet(px+8,py,0,-speed,dmgBase);
+  }else if(weaponLevel === 3){
+    // สามทาง
+    addBullet(px,py,0,-speed,dmgBase);
+    addBullet(px-10,py,-150,-speed*0.95,dmgBase);
+    addBullet(px+10,py,150,-speed*0.95,dmgBase);
+  }else if(weaponLevel === 4){
+    // สี่นัด
+    addBullet(px-6,py,0,-speed,dmgBase);
+    addBullet(px+6,py,0,-speed,dmgBase);
+    addBullet(px-14,py,-200,-speed*0.9,dmgBase);
+    addBullet(px+14,py,200,-speed*0.9,dmgBase);
+  }else if(weaponLevel === 5){
+    // ห้านัดกระจาย
+    const vxList = [-260,-130,0,130,260];
+    for(const vx of vxList){
+      addBullet(px,py,vx,-speed*0.95,dmgBase+1);
+    }
+  }else if(weaponLevel === 6){
+    // เลเซอร์ Lv.6: ลำแสงอยู่ช่วงเวลาสั้น ๆ ทะลุศัตรูได้หลายตัว
+    const laserLife = 0.35;     // อยู่ 0.35 วินาที
+    const laserDamage = dmgBase+3;
+
+    bullets.push({
+      x:px,
+      y:py,
+      vx:0,
+      vy:0,
+      radius:6,
+      damage:laserDamage,
+      isLaser:true,
+      life:laserLife
+    });
+
+    // เลเซอร์โคตรร้อน + คูลดาวน์นาน
+    heatThisShot += 25;
+    thisCooldown   = 0.65;
+  }
+
+  // ความร้อนเพิ่ม
+  heat += heatThisShot;
+  if(heat >= maxHeat){
+    heat = maxHeat;
+    if (!overheat && sOverheat) {
+      // เพิ่งเข้า overheat ครั้งแรก รอบนี้
+      playSound(sOverheat);
+    }
+    overheat = true;
+  }
+  updateHeatUI();
+
+  // ตั้งคูลดาวน์
+  shootCooldown = thisCooldown;
+
+  // เสียงยิงปืน (เลเซอร์ใช้เสียงพิเศษ)
+  if (weaponLevel === 6 && sLaser) {
+    playSound(sLaser);
+  } else {
+    playSound(sShot);
+  }
+}
+
+
+// Enemy shooting
+function enemyShoot(e){
+  if(e.isBoss){
+    const vy=240;
+    enemyBullets.push({x:e.x, y:e.y+e.height/2, vx:0, vy, radius:4});
+    enemyBullets.push({x:e.x-28, y:e.y+e.height/2, vx:-160, vy, radius:4});
+    enemyBullets.push({x:e.x+28, y:e.y+e.height/2, vx:160, vy, radius:4});
+  }else{
+    enemyBullets.push({
+      x:e.x,
+      y:e.y+e.height/2,
+      vx:0,
+      vy:180+Math.random()*60,
+      radius:4
+    });
+  }
+}
+
+// Particles
+function spawnExplosion(x,y,color="#f97316"){
+  for(let i=0;i<14;i++){
+    const a = Math.random()*Math.PI*2;
+    const s = 80+Math.random()*160;
+    particles.push({
+      x,y,
+      vx:Math.cos(a)*s,
+      vy:Math.sin(a)*s,
+      life:0.4+Math.random()*0.4,
+      color
+    });
+  }
+}
+
+// Collisions
+function rectCircleCollide(rx,ry,rw,rh,cx,cy,cr){
+  const closestX = Math.max(rx,Math.min(cx,rx+rw));
+  const closestY = Math.max(ry,Math.min(cy,ry+rh));
+  const dx = cx-closestX;
+  const dy = cy-closestY;
+  return dx*dx+dy*dy < cr*cr;
+}
+function rectRectCollide(a,b){
+  return a.x < b.x+b.width &&
+         a.x+a.width > b.x &&
+         a.y < b.y+b.height;
+}
+
+// Lose life
+function loseLife(){
+  if(gameOver) return;
+  if(player.invincible>0) return;
+
+  lives--;
+  spawnExplosion(player.x,player.y,"#38bdf8");
+  playSound(sDmg);        // เสียงโดนยิง
+  shakeTime = 0.35;
+  player.invincible = 1.2;
+
+  if(lives<=0){
+    handleGameOver();
+  }
+  updateHUD();
+}
+
+// Game over
+function handleGameOver(){
+  if(gameOver) return;
+  gameOver = true;
+  gameRunning = false;
+
+  if(bgm) bgm.pause();
+
+  popupTitle.textContent="Game Over 💀";
+  popupText.textContent=
+`คุณเล่นได้เวลา ${elapsed.toFixed(1)} วินาที
+คะแนนรวม: ${score}
+Wave ที่ถึง: ${wave}
+
+กดปุ่มใด ๆ หรือคลิก เพื่อเริ่มใหม่อีกครั้ง`;
+  popup.style.display="flex";
+}
+
+// Reset
+function resetGame(){
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W;
+  canvas.height = H;
+
+  player = createPlayer();
+  bullets = [];
+  enemies = [];
+  enemyBullets = [];
+  particles = [];
+  powerups = [];
+
+  keys = {};
+  gameRunning=false;
+  gameOver=false;
+  lastTime=0;
+  elapsed=0;
+  score=0;
+  lives=3;
+  wave=1;
+  isBossWave=false;
+  weaponLevel=1;
+  heat=0;
+  overheat=false;
+  shootCooldown=0;
+  shakeTime=0;
+
+  initStars();
+  spawnWave();
+  updateHUD();
+  popup.style.display="flex";
+}
+
+// Start game
+function startGame(){
+  if(gameRunning) return;
+  gameRunning=true;
+  popup.style.display="none";
+
+  if(bgm){
+    bgm.currentTime = 0;
+    bgm.play().catch(()=>{});
+  }
+}
+
+// Update
+function update(dt){
+  if(!gameRunning) return;
+
+  elapsed += dt;
+  updateHUD();
+
+  if(player.invincible>0){
+    player.invincible -= dt;
+    if(player.invincible<0) player.invincible=0;
+  }
+
+  // heat cooling
+  let coolRate = baseCoolRate + weaponLevel*4;
+  if(overheat) coolRate *= 1.2;
+  if(heat>0){
+    heat -= coolRate*dt;
+    if(heat<0) heat=0;
+  }
+  if(overheat && heat <= maxHeat*0.25){
+    overheat = false;
+  }
+
+  // screen shake timer
+  if(shakeTime>0){
+    shakeTime -= dt;
+    if(shakeTime<0) shakeTime=0;
+  }
+
+  // Stars
+  for(const s of stars){
+    s.y += s.speed*dt;
+    if(s.y>H){
+      s.y=-10;
+      s.x=Math.random()*W;
+    }
+  }
+
+  // Player move
+  let dir=0;
+  if(keys["ArrowLeft"] || keys["KeyA"]) dir-=1;
+  if(keys["ArrowRight"]|| keys["KeyD"]) dir+=1;
+  player.x += dir*player.speed*dt;
+  const margin=30;
+  if(player.x<margin) player.x=margin;
+  if(player.x>W-margin) player.x=W-margin;
+
+  // Shooting via space key
+  if(keys["Space"]) tryShoot();
+
+  if(shootCooldown>0){
+    shootCooldown-=dt;
+    if(shootCooldown<0) shootCooldown=0;
+  }
+
+  // Bullets (เลเซอร์กับปกติ)
+  bullets = bullets.filter(b=>{
+    if(b.isLaser){
+      b.life -= dt;
+      return b.life > 0;
+    }else{
+      b.x += (b.vx||0)*dt;
+      b.y += b.vy*dt;
+      return b.y+b.radius>-20 && b.x>-40 && b.x<W+40;
+    }
+  });
+
+  // Enemies
+  for(const e of enemies){
+    if(e.isBoss){
+      e.x += e.vx*dt;
+      if(e.x<130 || e.x>W-130) e.vx*=-1;
+      e.y = e.baseY + Math.sin(elapsed*1.4)*18;
+    }else{
+      e.x += e.vx*dt;
+      if(e.x<40 || e.x>W-40) e.vx*=-1;
+      e.y += e.vy*dt*0.002;
+    }
+
+    e.shootTimer -= dt;
+    if(e.shootTimer<=0){
+      enemyShoot(e);
+      if(e.isBoss){
+        e.shootTimer=0.7+Math.random()*0.3;
+      }else{
+        e.shootTimer=1.4+Math.random()*1.2 - Math.min(0.7,wave*0.05);
+      }
+    }
+  }
+
+  // Bullets vs enemies (รวมเลเซอร์)
+  for(const b of bullets){
+    for(const e of enemies){
+      if(e.hp<=0) continue;
+
+      let hit = false;
+      if(b.isLaser){
+        const beamWidth = 14;
+        const beamRect = {
+          x: b.x - beamWidth/2,
+          y: 0,
+          width: beamWidth,
+          height: player.y - player.height/2
+        };
+        const enemyRect = {
+          x: e.x - e.width/2,
+          y: e.y - e.height/2,
+          width: e.width,
+          height: e.height
+        };
+        if(rectRectCollide(beamRect, enemyRect)){
+          hit = true;
+        }
+      }else{
+        if(rectCircleCollide(
+          e.x-e.width/2,e.y-e.height/2,e.width,e.height,
+          b.x,b.y,b.radius
+        )){
+          hit = true;
+        }
+      }
+
+      if(hit){
+        e.hp -= (b.damage||1);
+        if(!b.isLaser) b.hit = true; // เลเซอร์ทะลุได้
+        if(e.hp<=0){
+          spawnExplosion(e.x,e.y);
+          playSound(sHit); // ศัตรูตายมีเสียงระเบิด
+          score += e.isBoss ? 120*wave : 10*wave;
+
+          // drop
+          if(e.isBoss){
+            spawnPowerup(e.x-30,e.y+10,"weapon");
+            spawnPowerup(e.x+30,e.y+10,"heart");
+          }else{
+            const roll = Math.random();
+            if(roll<0.22 && lives<maxLives){
+              spawnPowerup(e.x,e.y,"heart");
+            }else if(roll<0.5 && weaponLevel<maxWeaponLevel){
+              spawnPowerup(e.x,e.y,"weapon");
+            }
+          }
+        }
+      }
+    }
+  }
+  bullets = bullets.filter(b=>!b.hit);
+
+  enemies = enemies.filter(e=>e.hp>0 && e.y<H+80);
+
+  // New wave
+  if(enemies.length===0){
+    wave++;
+    spawnWave();
+  }
+
+  // Enemy bullets
+  enemyBullets = enemyBullets.filter(b=>{
+    b.x += (b.vx||0)*dt;
+    b.y += b.vy*dt;
+    return b.y-b.radius<H+40 && b.x>-40 && b.x<W+40;
+  });
+
+  // Enemy bullets vs player
+  for(const b of enemyBullets){
+    if(player.invincible<=0 &&
+       rectCircleCollide(
+         player.x-player.width/2,player.y-player.height/2,
+         player.width,player.height,
+         b.x,b.y,b.radius
+       )){
+      b.dead=true;
+      loseLife();
+      if(gameOver) return;
+    }
+  }
+  enemyBullets = enemyBullets.filter(b=>!b.dead);
+
+  // Enemies vs player
+  for(const e of enemies){
+    const pr = {
+      x:player.x-player.width/2,
+      y:player.y-player.height/2,
+      width:player.width,
+      height:player.height
+    };
+    const er = {
+      x:e.x-e.width/2,
+      y:e.y-e.height/2,
+      width:e.width,
+      height:e.height
+    };
+    if(player.invincible<=0 && rectRectCollide(pr,er)){
+      e.hp=0;
+      spawnExplosion(e.x,e.y);
+      loseLife();
+      if(gameOver) return;
+    }
+  }
+
+  // Powerups
+  powerups = powerups.filter(p=>{
+    p.y += p.vy*dt;
+    const pr = {
+      x:player.x-player.width/2,
+      y:player.y-player.height/2,
+      width:player.width,
+      height:player.height
+    };
+    if(rectCircleCollide(pr.x,pr.y,pr.width,pr.height,p.x,p.y,10)){
+      if(p.type==="heart"){
+        if(lives<maxLives){
+          lives++;
+          playSound(sHeal);    // เสียงฮีล
+        }
+      }else if(p.type==="weapon"){
+        if(weaponLevel<maxWeaponLevel){
+          weaponLevel++;
+          playSound(sPower);   // เสียงอัปเกรดปืน
+        }
+      }
+      updateHUD();
+      return false;
+    }
+    return p.y<H+40;
+  });
+
+  // Particles
+  particles = particles.filter(p=>{
+    p.x += p.vx*dt;
+    p.y += p.vy*dt;
+    p.life -= dt;
+    return p.life>0;
+  });
+}
+
+// Draw
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  ctx.save();
+  if(shakeTime>0){
+    const progress = shakeTime/0.35;
+    const intensity = shakeMagnitude*progress;
+    const ox = (Math.random()*2-1)*intensity;
+    const oy = (Math.random()*2-1)*intensity;
+    ctx.translate(ox,oy);
+  }
+
+  // background
+  ctx.fillStyle="#020617";
+  ctx.fillRect(0,0,W,H);
+
+  // stars
+  for(const s of stars){
+    ctx.fillStyle="rgba(148,163,184,"+(0.3+s.size/3)+")";
+    ctx.fillRect(s.x,s.y,s.size,s.size);
+  }
+
+  // player ship
+  const p = player;
+  const px=p.x, py=p.y, pw=p.width, ph=p.height;
+
+  // glow
+  const glow = ctx.createRadialGradient(px,py,0,px,py,ph*1.5);
+  glow.addColorStop(0,"rgba(56,189,248,0.2)");
+  glow.addColorStop(1,"rgba(56,189,248,0)");
+  ctx.fillStyle=glow;
+  ctx.beginPath();
+  ctx.arc(px,py+ph*0.1,ph*1.5,0,Math.PI*2);
+  ctx.fill();
+
+  // body color by level
+  let c1="#38bdf8", c2="#a855f7";
+  if(weaponLevel===2){c1="#22c55e";c2="#0ea5e9";}
+  else if(weaponLevel===3){c1="#a855f7";c2="#ec4899";}
+  else if(weaponLevel===4){c1="#facc15";c2="#f97316";}
+  else if(weaponLevel===5){c1="#f97316";c2="#ef4444";}
+  else if(weaponLevel===6){c1="#e11d48";c2="#7c3aed";}
+
+  const grad = ctx.createLinearGradient(px,py-ph/2,px,py+ph/2);
+  grad.addColorStop(0,c1);
+  grad.addColorStop(1,c2);
+  ctx.fillStyle=grad;
+  ctx.strokeStyle="#020617";
+  ctx.lineWidth=2;
+
+  ctx.beginPath();
+  ctx.moveTo(px,py-ph/2);
+  ctx.lineTo(px+pw*0.24,py);
+  ctx.lineTo(px+pw*0.18,py+ph/2);
+  ctx.lineTo(px-pw*0.18,py+ph/2);
+  ctx.lineTo(px-pw*0.24,py);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // wings
+  ctx.fillStyle="#020617";
+  ctx.beginPath();
+  ctx.moveTo(px-pw*0.6,py+ph*0.2);
+  ctx.lineTo(px-pw*0.26,py);
+  ctx.lineTo(px-pw*0.16,py+ph*0.52);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(px+pw*0.6,py+ph*0.2);
+  ctx.lineTo(px+pw*0.26,py);
+  ctx.lineTo(px+pw*0.16,py+ph*0.52);
+  ctx.closePath();
+  ctx.fill();
+
+  // cockpit
+  ctx.fillStyle="rgba(15,23,42,0.96)";
+  ctx.beginPath();
+  ctx.ellipse(px,py-ph*0.15,pw*0.22,ph*0.22,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="rgba(248,250,252,0.4)";
+  ctx.beginPath();
+  ctx.ellipse(px-pw*0.05,py-ph*0.2,pw*0.07,ph*0.09,-0.4,0,Math.PI*2);
+  ctx.fill();
+
+  // flame
+  const flameLen = ph*(0.55+Math.sin(elapsed*18)*0.08);
+  const fg = ctx.createLinearGradient(px,py+ph/2,px,py+ph/2+flameLen);
+  fg.addColorStop(0,"rgba(251,191,36,1)");
+  fg.addColorStop(0.5,"rgba(249,115,22,0.9)");
+  fg.addColorStop(1,"rgba(239,68,68,0)");
+  ctx.fillStyle=fg;
+  ctx.beginPath();
+  ctx.moveTo(px-pw*0.12,py+ph/2);
+  ctx.lineTo(px+pw*0.12,py+ph/2);
+  ctx.lineTo(px,py+ph/2+flameLen);
+  ctx.closePath();
+  ctx.fill();
+
+  // bullets (รวมเลเซอร์)
+  for(const b of bullets){
+    if(b.isLaser){
+      // วาดเลเซอร์เป็น beam ยาวจากด้านบนถึงหน้าตัวละคร
+      const beamWidth = 14;
+      const topY = 0;
+      const bottomY = player.y - player.height/2;
+
+      const lg = ctx.createLinearGradient(b.x,topY,b.x,bottomY);
+      lg.addColorStop(0,"rgba(244,244,245,0.0)");
+      lg.addColorStop(0.2,"rgba(236,252,203,0.7)");
+      lg.addColorStop(0.5,"rgba(251,113,133,0.9)");
+      lg.addColorStop(1,"rgba(190,24,93,0.0)");
+      ctx.fillStyle = lg;
+
+      ctx.beginPath();
+      ctx.roundRect(
+        b.x - beamWidth/2,
+        topY,
+        beamWidth,
+        bottomY - topY,
+        6
+      );
+      ctx.fill();
+
+      // โกลว์รอบเลเซอร์
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "rgba(244,63,94,0.5)";
+      ctx.fillRect(
+        b.x - beamWidth,
+        topY,
+        beamWidth*2,
+        bottomY - topY
+      );
+      ctx.globalAlpha = 1;
+    }else{
+      const g = ctx.createLinearGradient(b.x,b.y-8,b.x,b.y+8);
+      g.addColorStop(0,"#e0f2fe");
+      g.addColorStop(1,"#38bdf8");
+      ctx.fillStyle=g;
+      ctx.beginPath();
+      ctx.arc(b.x,b.y,b.radius,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  // enemies
+  for(const e of enemies){
+    const ex=e.x, ey=e.y, ew=e.width, eh=e.height;
+    if(e.isBoss){
+      const pulse = 1+Math.sin(elapsed*3)*0.05;
+      const glowB = ctx.createRadialGradient(ex,ey,0,ex,ey,ew);
+      glowB.addColorStop(0,"rgba(248,113,113,0.9)");
+      glowB.addColorStop(1,"rgba(127,29,29,0)");
+      ctx.fillStyle=glowB;
+      ctx.beginPath();
+      ctx.arc(ex,ey,ew*0.9*pulse,0,Math.PI*2);
+      ctx.fill();
+
+      const eg = ctx.createRadialGradient(ex-ew/4,ey-eh/4,ew*0.1,ex,ey,ew*0.8);
+      eg.addColorStop(0,"#fecaca");
+      eg.addColorStop(0.4,"#f97316");
+      eg.addColorStop(1,"#7f1d1d");
+      ctx.fillStyle=eg;
+      ctx.strokeStyle="#450a0a";
+      ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.ellipse(ex,ey,ew*0.45,eh*0.45,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+
+      // eye
+      ctx.fillStyle="#f9fafb";
+      ctx.beginPath();
+      ctx.ellipse(ex,ey-eh*0.05,ew*0.2,eh*0.2,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle="#0f172a";
+      ctx.beginPath();
+      ctx.ellipse(ex,ey-eh*0.02,ew*0.11,eh*0.13,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle="rgba(248,250,252,0.8)";
+      ctx.beginPath();
+      ctx.ellipse(ex-ew*0.05,ey-eh*0.08,ew*0.04,eh*0.05,0,0,Math.PI*2);
+      ctx.fill();
+
+      // HP bar
+      const barW=ew*1.1, barH=8, ratio=e.hp/e.maxHp;
+      ctx.fillStyle="#0f172a";
+      ctx.fillRect(ex-barW/2,ey-eh*0.55,barW,barH);
+      ctx.fillStyle="#22c55e";
+      ctx.fillRect(ex-barW/2,ey-eh*0.55,barW*ratio,barH);
+    }else{
+      const shake = Math.sin(elapsed*10+ex*0.1)*1.5;
+      const gE = ctx.createRadialGradient(ex,ey,0,ex,ey,ew*0.9);
+      gE.addColorStop(0,"rgba(196,181,253,0.9)");
+      gE.addColorStop(1,"rgba(76,29,149,0)");
+      ctx.fillStyle=gE;
+      ctx.beginPath();
+      ctx.arc(ex,ey,ew*0.7,0,Math.PI*2);
+      ctx.fill();
+
+      const eg2 = ctx.createLinearGradient(ex-ew/2,ey-eh/2,ex+ew/2,ey+eh/2);
+      eg2.addColorStop(0,"#4c1d95");
+      eg2.addColorStop(0.5,"#7c3aed");
+      eg2.addColorStop(1,"#db2777");
+      ctx.fillStyle=eg2;
+      ctx.strokeStyle="#1e1b4b";
+      ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.ellipse(ex,ey+shake*0.2,ew*0.45,eh*0.4,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.stroke();
+
+      // eye
+      ctx.fillStyle="#fef9c3";
+      ctx.beginPath();
+      ctx.ellipse(ex,ey-eh*0.02,ew*0.18,eh*0.2,0,0,Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle="#0f172a";
+      ctx.beginPath();
+      ctx.ellipse(ex,ey+eh*0.01,ew*0.1,eh*0.12,0,0,Math.PI*2);
+      ctx.fill();
+
+      // HP bar (ถ้าอึด)
+      if(e.maxHp>1){
+        const barW=ew*0.9, barH=4, ratio=e.hp/e.maxHp;
+        ctx.fillStyle="#0f172a";
+        ctx.fillRect(ex-barW/2,ey-eh*0.5,barW,barH);
+        ctx.fillStyle="#22c55e";
+        ctx.fillRect(ex-barW/2,ey-eh*0.5,barW*ratio,barH);
+      }
+    }
+  }
+
+  // enemy bullets
+  for(const b of enemyBullets){
+    const g = ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.radius*2);
+    g.addColorStop(0,"#fecaca");
+    g.addColorStop(1,"#ef4444");
+    ctx.fillStyle=g;
+    ctx.beginPath();
+    ctx.arc(b.x,b.y,b.radius,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  // powerups
+  for(const p2 of powerups){
+    const bob = Math.sin(elapsed*4+p2.x*0.05)*3;
+    if(p2.type==="heart"){
+      ctx.save();
+      ctx.translate(p2.x,p2.y+bob);
+      const hg = ctx.createRadialGradient(0,0,0,0,0,20);
+      hg.addColorStop(0,"rgba(248,113,113,0.9)");
+      hg.addColorStop(1,"rgba(127,29,29,0)");
+      ctx.fillStyle=hg;
+      ctx.beginPath();
+      ctx.arc(0,0,18,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.scale(0.9,0.9);
+      ctx.fillStyle="#fb7185";
+      ctx.beginPath();
+      ctx.moveTo(0,6);
+      ctx.bezierCurveTo(-14,-10,-20,6,0,20);
+      ctx.bezierCurveTo(20,6,14,-10,0,6);
+      ctx.fill();
+      ctx.restore();
+    }else{
+      ctx.save();
+      ctx.translate(p2.x,p2.y+bob);
+      const wg = ctx.createRadialGradient(0,0,0,0,0,20);
+      wg.addColorStop(0,"rgba(250,204,21,0.9)");
+      wg.addColorStop(1,"rgba(113,63,18,0)");
+      ctx.fillStyle=wg;
+      ctx.beginPath();
+      ctx.arc(0,0,18,0,Math.PI*2);
+      ctx.fill();
+
+      ctx.rotate(Math.sin(elapsed*3+p2.y*0.03)*0.25);
+      ctx.fillStyle="#facc15";
+      ctx.beginPath();
+      ctx.roundRect(-12,-12,24,24,6);
+      ctx.fill();
+
+      ctx.fillStyle="#0f172a";
+      ctx.fillRect(-7,-2,14,4);
+      ctx.fillRect(-2,-9,4,7);
+      ctx.restore();
+    }
+  }
+
+  // particles
+  for(const p3 of particles){
+    ctx.globalAlpha = Math.max(0,p3.life*2);
+    ctx.fillStyle=p3.color;
+    ctx.fillRect(p3.x,p3.y,3,3);
+  }
+  ctx.globalAlpha=1;
+
+  ctx.restore();
+}
+
+// Loop
+function loop(ts){
+  const dt = lastTime ? (ts-lastTime)/1000 : 0;
+  lastTime = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+resetGame();
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
