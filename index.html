@@ -27,6 +27,28 @@
                  #020617;
     }
 
+  #mobileControls{
+  position:fixed;
+  bottom:20px;
+  left:0;
+  width:100%;
+  display:flex;
+  justify-content:space-between;
+  padding:0 20px;
+  z-index:15;
+}
+
+#mobileControls button{
+  width:70px;
+  height:70px;
+  font-size:28px;
+  border-radius:50%;
+  border:none;
+  background:rgba(15,23,42,.85);
+  color:white;
+  border:1px solid rgba(148,163,184,.7);
+}
+
     .hud{
       position:fixed;
       top:8px;
@@ -928,6 +950,18 @@ function draw(){
     ctx.translate(ox,oy);
   }
 
+canvas.addEventListener("touchstart", e=>{
+  e.preventDefault();
+  if(!gameRunning && !gameOver){
+    startGame();
+  }else if(gameOver){
+    resetGame();
+  }else{
+    tryShoot();
+  }
+},{passive:false});
+
+
   // background
   ctx.fillStyle="#020617";
   ctx.fillRect(0,0,W,H);
@@ -975,6 +1009,28 @@ function draw(){
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+
+const btnLeft  = document.getElementById("btnLeft");
+const btnRight = document.getElementById("btnRight");
+
+// ซ้าย
+btnLeft.addEventListener("touchstart", e=>{
+  e.preventDefault();
+  keys["ArrowLeft"] = true;
+});
+btnLeft.addEventListener("touchend", ()=>{
+  keys["ArrowLeft"] = false;
+});
+
+// ขวา
+btnRight.addEventListener("touchstart", e=>{
+  e.preventDefault();
+  keys["ArrowRight"] = true;
+});
+btnRight.addEventListener("touchend", ()=>{
+  keys["ArrowRight"] = false;
+});
+
 
   // wings
   ctx.fillStyle="#020617";
