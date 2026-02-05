@@ -27,27 +27,86 @@
                  #020617;
     }
 
-  #mobileControls{
+    #btnLeft{
+  background:
+    url("/left.png") center/60% no-repeat,
+    rgba(241, 56, 10, 0.85);
+}
+
+#btnRight{
+  background:
+    url("/right.png") center/50% no-repeat,
+    rgba(15,23,42,.85);
+}
+
+
+#mobileControls{
   position:fixed;
   bottom:20px;
-  left:0;
-  width:100%;
+  left:20px;
   display:flex;
-  justify-content:space-between;
-  padding:0 20px;
+  gap:10px;
   z-index:15;
 }
 
+
+
 #mobileControls button{
-  width:70px;
-  height:70px;
-  font-size:28px;
+  width:90px;
+  height:90px;
+  font-size:36px;
+
   border-radius:50%;
-  border:none;
+  border:1px solid rgba(148,163,184,.9);
   background:rgba(15,23,42,.85);
-  color:white;
-  border:1px solid rgba(148,163,184,.7);
+  color:#e5e7eb;
+
+  box-shadow:
+    0 0 12px rgba(56,189,248,.6),
+    0 0 28px rgba(168,85,247,.45);
+
+  transition:
+    transform .08s ease,
+    box-shadow .12s ease,
+    background .12s ease;
+
+  touch-action:none;
 }
+
+#mobileControls button:active{
+  transform:scale(0.92);
+
+  background:rgba(30,64,175,.9);
+
+  box-shadow:
+    0 0 18px rgba(56,189,248,.9),
+    0 0 40px rgba(168,85,247,.8),
+    inset 0 0 14px rgba(255,255,255,.25);
+}
+
+@keyframes glowPulse{
+  0%{
+    box-shadow:
+      0 0 10px rgba(56,189,248,.5),
+      0 0 22px rgba(168,85,247,.35);
+  }
+  50%{
+    box-shadow:
+      0 0 20px rgba(56,189,248,.9),
+      0 0 44px rgba(168,85,247,.75);
+  }
+  100%{
+    box-shadow:
+      0 0 10px rgba(56,189,248,.5),
+      0 0 22px rgba(168,85,247,.35);
+  }
+}
+
+#mobileControls button{
+  animation:glowPulse 1.8s infinite ease-in-out;
+}
+
+
 
     .hud{
       position:fixed;
@@ -162,8 +221,8 @@
 
 <!-- Mobile Controls -->
 <div id="mobileControls">
-  <button id="btnLeft">⬅️</button>
-  <button id="btnRight">➡️</button>
+  <button id="btnLeft"></button>
+  <button id="btnRight"></button>
 </div>
 
 
@@ -176,6 +235,7 @@
 <audio id="s-heal"   src="heal.mp3"       preload="auto"></audio>
 <audio id="s-laser"   src="laser.mp3"       preload="auto"></audio>
 <audio id="s-overheat" src="overheat.mp3"    preload="auto"></audio>
+
 
 <!-- HUD -->
 <div class="hud">
