@@ -2,8 +2,10 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8">
-  <title>Star Blaster - By.Titinan</title>
+  <title>Star Blaster - Overheat + Laser Lv.6</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  
 
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -135,6 +137,13 @@
 <body>
 
 <canvas id="gameCanvas"></canvas>
+
+<!-- Mobile Controls -->
+<div id="mobileControls">
+  <button id="btnLeft">⬅️</button>
+  <button id="btnRight">➡️</button>
+</div>
+
 
 <!-- เสียง (ไม่มีก็เงียบ แต่เล่นได้) -->
 <audio id="bgm"      src="bgm.mp3"        preload="auto" loop></audio>
@@ -802,7 +811,7 @@ function update(dt){
 
           // drop
           if(e.isBoss){
-            spawnPowerup(e.x-30,e.y+10,"weapon");
+            spawnPowerup(e.x-30,e.y+1000,"weapon");
             spawnPowerup(e.x+30,e.y+10,"heart");
           }else{
             const roll = Math.random();
